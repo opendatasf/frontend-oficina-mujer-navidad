@@ -1,248 +1,511 @@
-import { useEffect, useState } from "react";
-import { Form, Input, Select, DatePicker, Checkbox, Button, ConfigProvider } from "antd";
-import esES from "antd/es/locale/es_ES";
-import "dayjs/locale/es";
+// src/Formulario.jsx
+import React, { useState } from 'react';
+import GuardarEnSheets from './GuardarEnSheets';
+import Swal from 'sweetalert2';
 
-import logo from "./assets/logos/sflogosvg.png";
-import logo4 from "./assets/logos/SF3.jpg";
-import DtoMujer from "./assets/logos/DtoMujer.svg";
-import infLOGO from "./assets/logos/informatica.svg";
-import panoramica2 from "./assets/logos/mujerTaller3.webp";
-
-import Swal from "sweetalert2";
-import selects from "./optionsSelect.json";
-import { initializeGapi } from "./googleAuth";
-import GuardarEnSheets from "./GuardarEnSheets";
-/*import { generarFichaDesdePlantilla } from "./generateFicha";*/
-//force deploy vercel
-const Formulario = () => {
-    initializeGapi();
-
-    const [formData, setFormData] = useState({});
-    const [talleresHoja, setTalleres] = useState([]);
-    const [loading, setLoading] = useState(false); // <-- nuevo estado
-
-    // Cargar talleres desde Google Sheets
-    useEffect(() => {
-        const url =
-            "https://docs.google.com/spreadsheets/d/e/2PACX-1vSgRoSlDAGk_575DYTlpnTfuc5OvFI0FDIKuc5Rnda0z6SGDE7sewf_VUUZnmJc9QsDhLUe6LSSkB9V/pub?gid=0&single=true&output=csv";
-
-        fetch(url)
-            .then((res) => res.text())
-            .then((csvText) => {
-                const rows = csvText.split("\n").map((row) => row.trim()).filter(Boolean);
-                const formatted = rows.map((row) => {
-                    const valor = row.split(",")[0].trim();
-                    return { value: valor, label: valor };
-                });
-                setTalleres(formatted);
-            })
-            .catch(console.error);
-    }, []);
-
-    // Validador de RUT (chileno)
-    const validarRUT = (_, value) => {
-        if (!value) return Promise.reject("El RUT es obligatorio");
-        const clean = value.replace(/[.]/g, "").toUpperCase();
-        if (!/^\d{7,8}-[0-9K]$/.test(clean)) return Promise.reject("RUT inválido");
-
-        const [cuerpo, dv] = clean.split("-");
-
-        let suma = 0, mult = 2;
-
-        for (let i = cuerpo.length - 1; i >= 0; i--) {
-            suma += parseInt(cuerpo.charAt(i)) * mult;
-            mult = mult < 7 ? mult + 1 : 2;
-        }
-
-        const dvEsperado = 11 - (suma % 11);
-        const dvCalc = dvEsperado === 11 ? "0" : dvEsperado === 10 ? "K" : dvEsperado.toString();
-
-        return dv === dvCalc ? Promise.resolve() : Promise.reject("RUT inválido");
-    };
-    const currentYear = new Date().getFullYear();
-
-    // Enviar formulario
-    const handleFinish = async (values) => {
-        setLoading(true); // activar loading
-        try {
-            const data = {
-                ...values,
-                text_nombre_completo: `${values.text_nombres} ${values.text_apellidos}`,
-                // Formateos:
-                text_fecha_nacimiento: values.text_fecha_nacimiento
-                    ? values.text_fecha_nacimiento.format("YYYY-MM-DD")
-                    : "",
-                text_20sknx: values.text_20sknx
-                    ? values.text_20sknx.format("YYYY") // <-- solo aAÑO
-                    : currentYear,
-            };
-
-            setFormData(data);
-            await GuardarEnSheets(data);
-            /*await generarFichaDesdePlantilla(data);*/
-            Swal.fire({
-                icon: "success",
-                title: "¡Enviado!",
-                text: "Los datos se guardaron y el documento fue generado con éxito.",
-            });
-        } catch (err) {
-            console.error("❌ Error al enviar:", err);
-            Swal.fire({
-                icon: "error",
-                title: "Oops...",
-                text: "Ocurrió un error al enviar los datos o generar el documento.",
-            });
-        } finally {
-            setLoading(false); // desactivar loading siempre
-        }
-    };
-        // Opciones para select de años 2020-2030
-        const anios = Array.from({ length: 11 }, (_, i) => {
-            const year = 2020 + i;
-            return { value: year.toString(), label: year.toString() };
-        });
-    return (
-        <ConfigProvider locale={esES}>
-            <div
-                className="min-h-screen flex flex-col items-center justify-center p-4 relative overflow-hidden"
-                style={{
-                    backgroundImage: `url(${panoramica2})`,
-                    backgroundSize: "cover",
-                    backgroundPosition: "bottom",
-                }}
-            >
-                <div className="w-full max-w-2xl bg-white p-6 rounded-lg shadow-md relative z-10 h-[90vh] overflow-y-auto">
-                    {/* Banner superior */}
-                    <div className="bg-electricViolet-300 text-electricViolet-950 text-center py-2 rounded-md shadow-md mb-4">
-                        <span className="text-lg font-bold uppercase tracking-wide">
-                          Oficina de la Mujer
-                        </span>
-                    </div>
-
-                    {/* Logos */}
-                    <div className="flex flex-col md:flex-row justify-between items-center bg-gray-200 p-4 mb-6 rounded relative overflow-hidden">
-                        <div className="absolute inset-0">
-                            <img src={logo4} className="w-full h-full object-cover" />
-                            <div className="absolute inset-0 bg-gradient-to-r from-blue-500 to-transparent opacity-50"></div>
-                        </div>
-                        <img
-                            src={infLOGO}
-                            className="p-5 absolute right-4 top-1/2 transform -translate-y-1/2 w-40 h-auto object-contain z-10"
-                        />
-                        <img
-                            src={DtoMujer}
-                            className="p-5 absolute right-4 top-1/2 transform -translate-x-24 -translate-y-1/2 w-40 h-auto object-contain z-10"
-                        />
-                        <div className="relative z-10 w-24 h-24 flex items-center justify-center">
-                            <img src={logo} className="w-full h-full object-contain" />
-                        </div>
-                    </div>
-
-                    {/* Formulario */}
-                    <Form layout="vertical" onFinish={handleFinish} initialValues={{ ...formData, anio: currentYear.toString() }}>
-                        <div className="bg-electricViolet-300 text-electricViolet-950 text-center py-2 rounded-md shadow-md mb-4">
-                          <span className="text-lg font-bold uppercase tracking-wide">
-                            Información del Taller
-                          </span>
-                        </div>
-                        <Form.Item
-                            label="Taller"
-                            name="text_nombre_taller"
-                            rules={[{ required: true, message: "Campo obligatorio" }]}
-                        >
-                            <Select options={talleresHoja} placeholder="Selecciona taller" />
-                        </Form.Item>
-                        <Form.Item label="Monitor(a)" name="text_monitor" rules={[{ required: true }]}>
-                            <Input placeholder="Christian Ramos" />
-                        </Form.Item>
-                        <Form.Item label="Día" name="text_dia" rules={[{ required: true }]}>
-                            <Input />
-                        </Form.Item>
-                        <Form.Item label="Horario" name="text_horario" rules={[{ required: true }]}>
-                            <Input />
-                        </Form.Item>
-                        <Form.Item label="Semestre" name="text_semestre" rules={[{ required: true }]}>
-                            <Select options={selects.semestre} placeholder="Selecciona semestre" />
-                        </Form.Item>
-                        <Form.Item
-                            label="Año del Taller"
-                            name="anio"
-                            rules={[{ required: true, message: "Debes seleccionar un año" }]}
-
-                        >
-                            <Select placeholder="Selecciona un año" options={anios} />
-                        </Form.Item>
-                        <div className="bg-electricViolet-300 text-electricViolet-950 text-center py-2 rounded-md shadow-md my-4">
-                          <span className="text-lg font-bold uppercase tracking-wide">
-                            Información de Alumna
-                          </span>
-                        </div>
-                        <Form.Item label="Cédula de Identidad" name="text_cedula" rules={[{ validator: validarRUT,required: true }]}>
-                            <Input placeholder="12345678-9" maxLength={10} />
-                        </Form.Item>
-                        <Form.Item label="Nombres" name="text_nombres" rules={[{ required: true }]}>
-                            <Input placeholder="Tomás Felipe" />
-                        </Form.Item>
-                        <Form.Item label="Apellidos" name="text_apellidos" rules={[{ required: true }]}>
-                            <Input placeholder="Saldaña Palominos" />
-                        </Form.Item>
-                        <Form.Item label="Nacionalidad" name="text_nacionalidad" rules={[{ required: true }]}>
-                            <Select options={selects.nacionalidad} placeholder="Selecciona nacionalidad" />
-                        </Form.Item>
-                        <Form.Item label="Fecha de nacimiento" name="text_fecha_nacimiento" rules={[{ required: true }]}>
-                            <DatePicker style={{ width: "100%" }} format="DD/MM/YYYY" placeholder="DD/MM/AAAA" />
-                        </Form.Item>
-                        <Form.Item label="Escolaridad" name="text_escolaridad" rules={[{ required: true }]}>
-                            <Select options={selects.escolaridad} placeholder="Selecciona escolaridad" />
-                        </Form.Item>
-                        <Form.Item label="Estado Civil" name="text_estado_civil" rules={[{ required: true }]}>
-                            <Select options={selects.estadoCivil} placeholder="Selecciona estado civil" />
-                        </Form.Item>
-                        <Form.Item label="Domicilio" name="text_domicilio" rules={[{ required: true }]}>
-                            <Input placeholder="Argomedo, #123" />
-                        </Form.Item>
-                        <Form.Item label="Teléfono de contacto" name="text_telefono" rules={[{ required: true, message: "Campo obligatorio" }]}>
-                            <Input placeholder="+569 12345678" />
-                        </Form.Item>
-                        <Form.Item label="¿Enfermedad preexistente?" name="text_enfermedades">
-                            <Input />
-                        </Form.Item>
-                        <Form.Item label="¿Discapacidad?" name="text_discapacidad">
-                            <Input />
-                        </Form.Item>
-                        <Form.Item label="¿Derivación?" name="text_derivacion">
-                            <Input />
-                        </Form.Item>
-                        <Form.Item label="¿Otros talleres?" name="text_otros_talleres">
-                            <Input placeholder="Customizar chaquetas" />
-                        </Form.Item>
-                        <div className="bg-electricViolet-300 text-electricViolet-950 text-center py-2 rounded-md shadow-md mt-6 mb-4">
-                          <span className="text-lg font-bold uppercase tracking-wide">
-                            Documentación
-                          </span>
-                        </div>
-                        <Form.Item name="checkbox_19bqbu" valuePropName="checked">
-                            <Checkbox>Fotocopia Cédula de Identidad</Checkbox>
-                        </Form.Item>
-                        <Form.Item name="checkbox_20ddbp" valuePropName="checked">
-                            <Checkbox>Registro Social de Hogares</Checkbox>
-                        </Form.Item>
-                        <Form.Item>
-                            <Button
-                                type="primary"
-                                htmlType="submit"
-                                className="bg-electricViolet-500 w-full mt-4"
-                                loading={loading}
-                            >
-                                Enviar
-                            </Button>
-                        </Form.Item>
-                    </Form>
-                </div>
-            </div>
-        </ConfigProvider>
-    );
+const BENEFICIARIO_VACIO = {
+  nombreFuncionario: '',
+  apellidoFuncionario: '',
+  apellido2Funcionario: '',
+  cargo: '',
+  nombreHijo: '',
+  sexo: '',
+  edad: '',
 };
 
-export default Formulario;
+export default function Formulario() {
+  const [general, setGeneral] = useState({ direccion: '' });
+  const [beneficiarios, setBeneficiarios] = useState([{ ...BENEFICIARIO_VACIO }]);
+  const [enviando, setEnviando] = useState(false);
+  const [mensaje, setMensaje] = useState(null);
+  const [error, setError] = useState(null);
+
+  const onChangeGeneral = (e) => {
+    const { name, value } = e.target;
+    setGeneral((g) => ({ ...g, [name]: value }));
+  };
+
+  const onChangeBenef = (idx, e) => {
+    const { name, value } = e.target;
+    setBeneficiarios((prev) =>
+      prev.map((b, i) => (i === idx ? { ...b, [name]: value } : b))
+    );
+  };
+
+  const agregarBeneficiario = () => {
+    setBeneficiarios((prev) => [...prev, { ...BENEFICIARIO_VACIO }]);
+  };
+
+  const eliminarBeneficiario = async (idx) => {
+    const b = beneficiarios[idx];
+    const nombreMostrado = [b?.nombreFuncionario, b?.apellidoFuncionario, b?.apellido2Funcionario]
+      .filter(Boolean)
+      .join(' ')
+      .trim() || `Beneficiario #${idx + 1}`;
+
+    const { isConfirmed } = await Swal.fire({
+      icon: 'warning',
+      title: '¿Eliminar beneficiario?',
+      html: `Se eliminará <b>${nombreMostrado}</b>.`,
+      showCancelButton: true,
+      confirmButtonText: 'Sí, eliminar',
+      cancelButtonText: 'Cancelar',
+      confirmButtonColor: '#d33',
+    });
+    if (!isConfirmed) return;
+
+    setBeneficiarios((prev) => {
+      if (prev.length === 1) return [{ ...BENEFICIARIO_VACIO }];
+      return prev.filter((_, i) => i !== idx);
+    });
+
+    await Swal.fire({
+      icon: 'success',
+      title: 'Eliminado',
+      timer: 1200,
+      showConfirmButton: false,
+    });
+  };
+
+  const validar = () => {
+    if (!general.direccion.trim()) return 'La dirección es obligatoria.';
+    if (beneficiarios.length === 0) return 'Agrega al menos un beneficiario.';
+    for (let i = 0; i < beneficiarios.length; i++) {
+      const b = beneficiarios[i];
+      if (!b.nombreFuncionario.trim())
+        return `Beneficiario #${i + 1}: falta el nombre del funcionario.`;
+      if (!b.apellidoFuncionario.trim())
+        return `Beneficiario #${i + 1}: falta el primer apellido del funcionario.`;
+      if (!b.apellido2Funcionario.trim())
+        return `Beneficiario #${i + 1}: falta el segundo apellido del funcionario.`;
+      if (!b.nombreHijo.trim())
+        return `Beneficiario #${i + 1}: falta el nombre del hijo/a.`;
+      if (!String(b.sexo).trim())
+        return `Beneficiario #${i + 1}: falta el sexo del hijo/a.`;
+      if (!String(b.edad).trim())
+        return `Beneficiario #${i + 1}: falta la edad.`;
+      const edadNum = Number(b.edad);
+      if (!Number.isFinite(edadNum) || edadNum < 0)
+        return `Beneficiario #${i + 1}: la edad no es válida.`;
+    }
+    return null;
+  };
+
+  const onSubmit = async (e) => {
+    e.preventDefault();
+    setMensaje(null);
+    setError(null);
+
+    const err = validar();
+    if (err) {
+      Swal.fire({ icon: 'warning', title: 'Validación incompleta', text: err });
+      return;
+    }
+
+    const payload = {
+      general: { direccion: general.direccion },
+      beneficiarios: beneficiarios.map((b) => ({
+        nombreFuncionario: b.nombreFuncionario,
+        apellidoFuncionario: b.apellidoFuncionario,
+        apellido2Funcionario: b.apellido2Funcionario,
+        nombreHijo: b.nombreHijo,
+        sexo: b.sexo,
+        edad: Number(b.edad),
+      })),
+    };
+
+    try {
+      setEnviando(true);
+      const res = await GuardarEnSheets(payload);
+      Swal.fire({
+        icon: 'success',
+        title: '¡Enviado!',
+        text: res.message || 'Los datos fueron guardados con éxito en Sheets.',
+      });
+    } catch (e2) {
+      console.error(e2);
+      Swal.fire({
+        icon: 'error',
+        title: 'Oops...',
+        text: e2.message || 'Ocurrió un error al enviar los datos.',
+      });
+    } finally {
+      setEnviando(false);
+    }
+  };
+
+  return (
+    <div
+      style={{
+        minHeight: '100vh',
+        display: 'flex',
+        flexDirection: 'column', // sticky footer
+        backgroundImage: 'url("/image2.jpg")',
+        backgroundSize: 'cover',
+        backgroundPosition: 'center',
+        backgroundRepeat: 'no-repeat',
+      }}
+    >
+      {/* CONTENIDO PRINCIPAL */}
+      <main style={{ flex: 1, padding: '24px 16px' }}>
+        {/* Tarjeta unificada: Cinta + Hero + Datos del Responsable */}
+        <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 16 }}>
+          <section
+            style={{
+              width: 'min(1080px, 100%)',
+              borderRadius: 14,
+              overflow: 'hidden',
+              boxShadow: '0 10px 26px rgba(0,0,0,0.18)',
+              background: 'rgba(255,255,255,0.92)',
+            }}
+          >
+            {/* Cinta */}
+            <div
+              style={{
+                background: 'linear-gradient(90deg, #d32f2f, #e53935)',
+                color: '#fff',
+                padding: '12px 20px',
+                fontWeight: 800,
+                fontSize: 20,
+                textAlign: 'center',
+                letterSpacing: 0.2,
+              }}
+            >
+              <span aria-hidden="true">🎄</span> Programa de Navidad{' '}
+              <span aria-hidden="true">🎄</span>
+            </div>
+
+            {/* Hero */}
+            {/* Hero con overlay + texto encima + logo derecha */}
+            <div
+            style={{
+                position: 'relative',
+                height: 180,
+                backgroundImage: 'url("/navidad.jpg")',
+                backgroundSize: 'cover',
+                backgroundPosition: 'center',
+                filter: 'brightness(0.7)', // oscurece la imagen de fondo
+            }}
+            >
+            {/* Texto centrado */}
+            <div
+                style={{
+                position: 'absolute',
+                top: '50%',
+                left: '50%',
+                transform: 'translate(-50%, -50%)',
+                color: 'white',
+                textAlign: 'center',
+                fontWeight: 800,
+                textShadow: '0 2px 6px rgba(0,0,0,0.6)',
+                }}
+            >
+                <div style={{ fontSize: 28, marginBottom: 6 }}>¡Celebremos juntos la Navidad!</div>
+                <div style={{ fontSize: 16 }}>
+                Registro de hijos de funcionarios y actividades especiales
+                </div>
+            </div>
+
+            {/* Logo en la esquina derecha */}
+            <img
+                src="/sflogosvg.png"
+                alt="Logo Municipalidad de San Fernando"
+                style={{
+                position: 'absolute',
+                top: '30%',
+                right: 20,
+                transform: 'translateY(-50%)',
+                height: 80,
+                opacity: 0.9,
+                }}
+            />
+            </div>
+
+
+
+            {/* Datos del Responsable */}
+            <div style={{ padding: 18 }}>
+              <div
+                style={{
+                  fontWeight: 800,
+                  color: '#374151',
+                  marginBottom: 10,
+                  fontSize: 18,
+                }}
+              >
+                Datos del Generales
+              </div>
+
+              <div style={{ marginBottom: 10 }}>
+                <label style={{ display: 'block', fontWeight: 600, marginBottom: 6 }}>
+                  Dirección / Departamento / Área
+                </label>
+                <select
+                  name="direccion"
+                  value={general.direccion}
+                  onChange={onChangeGeneral}
+                  style={{
+                    width: '100%',
+                    padding: '12px 14px',
+                    borderRadius: 10,
+                    border: '1px solid #e5e7eb',
+                    outline: 'none',
+                    boxShadow: '0 1px 0 rgba(0,0,0,0.02) inset',
+                    backgroundColor: 'white',
+                  }}
+                >
+                  <option value="">Seleccione una opción…</option>
+                  <option value="DAJ">Dirección de Asesoría Jurídica</option>
+                  <option value="DAF">Dirección de Administración y Finanzas</option>
+                  <option value="SECPLAN">Secretaría Comunal de Planificación</option>
+                  <option value="UGRD">Unidad de Gestión de Riesgos y Desastres</option>
+                  <option value="JPL">Juzgado de Policía Local</option>
+                  <option value="SP">Dirección de Seguridad Pública</option>
+                  <option value="SSGG">Dirección de Servicios Generales</option>
+                  <option value="DIDECO">Dirección de Desarrollo Comunitario</option>
+                  <option value="TRANSITO">Dirección de Tránsito y Transportes</option>
+                  <option value="DOM">Dirección de Obras Municipales</option>
+                  <option value="CONTRALORIA">Dirección de Control Interno</option>
+                  <option value="RRHH">Dirección de Recursos Humanos</option>
+                  <option value="ADM">Administración Municipal</option>
+                  <option value="SECMUN">Secretaría Municipal</option>
+                  <option value="ALC">Alcaldía</option>
+                </select>
+              </div>
+            </div>
+          </section>
+        </div>
+
+        {/* Contenedor central para Beneficiarios y botón Enviar */}
+        <div style={{ width: 'min(1080px, 100%)', margin: '0 auto' }}>
+          {/* Tarjeta: Hijos/Beneficiarios */}
+          <section
+            style={{
+              background: 'rgba(255,255,255,0.92)',
+              borderRadius: 12,
+              boxShadow: '0 10px 26px rgba(0,0,0,0.18)',
+              overflow: 'hidden',
+            }}
+          >
+            <div
+              style={{
+                background: 'linear-gradient(90deg,#c62828,#d32f2f)',
+                color: '#fff',
+                padding: '14px 18px',
+                fontWeight: 800,
+                fontSize: 16,
+                letterSpacing: 0.3,
+                display: 'flex',
+                alignItems: 'center',
+                gap: 10,
+              }}
+            >
+              <span style={{ fontSize: 18 }}>🎁</span>
+              Registro de Hijos de Funcionarios
+            </div>
+
+            <div style={{ padding: 18 }}>
+              {/* Encabezados tipo tabla */}
+              <div
+                style={{
+                  display: 'grid',
+                  gridTemplateColumns: '1.1fr 1fr 1fr 1fr 120px 150px 90px',
+                  gap: 10,
+                  fontSize: 13,
+                  fontWeight: 700,
+                  color: '#374151',
+                  padding: '10px 12px',
+                  background: '#faf7f7',
+                  border: '1px dashed #e5e7eb',
+                  borderRadius: 10,
+                  marginBottom: 10,
+                }}
+              >
+                <div>Nombre funcionario</div>
+                <div>Primer apellido</div>
+                <div>Segundo apellido</div>
+                <div>Cargo</div>
+                <div>Nombre completo hijo/a</div>
+                <div>Edad</div>
+                <div>Sexo del hijo/a</div>
+                <div style={{ textAlign: 'center' }}>Acción</div>
+              </div>
+
+              {/* Filas */}
+              {beneficiarios.map((b, idx) => (
+                <div
+                  key={idx}
+                  style={{
+                    display: 'grid',
+                    gridTemplateColumns: '1.1fr 1fr 1fr 1fr 120px 150px 90px',
+                    gap: 10,
+                    padding: '10px 12px',
+                    alignItems: 'center',
+                    border: '1px solid #f1f1f1',
+                    borderRadius: 10,
+                    background: '#fff',
+                    marginBottom: 10,
+                  }}
+                >
+                  <input
+                    type="text"
+                    name="nombreFuncionario"
+                    value={b.nombreFuncionario}
+                    onChange={(e) => onChangeBenef(idx, e)}
+                    placeholder="Ej: Juan"
+                    style={inputStyle}
+                  />
+                  <input
+                    type="text"
+                    name="apellidoFuncionario"
+                    value={b.apellidoFuncionario}
+                    onChange={(e) => onChangeBenef(idx, e)}
+                    placeholder="Ej: Pérez"
+                    style={inputStyle}
+                  />
+                  <input
+                    type="text"
+                    name="apellido2Funcionario"
+                    value={b.apellido2Funcionario}
+                    onChange={(e) => onChangeBenef(idx, e)}
+                    placeholder="Ej: Cortés"
+                    style={inputStyle}
+                  />
+                  <input
+                    type="text"
+                    name="cargo"
+                    value={b.cargo}
+                    onChange={(e) => onChangeBenef(idx, e)}
+                    placeholder="Ej: Encargado de Inframenor"
+                    style={inputStyle}
+                  />
+                  <input
+                    type="text"
+                    name="nombreHijo"
+                    value={b.nombreHijo}
+                    onChange={(e) => onChangeBenef(idx, e)}
+                    placeholder="Ej: Ana Ramires Nuñez"
+                    style={inputStyle}
+                  />
+                  <input
+                    type="number"
+                    name="edad"
+                    value={b.edad}
+                    onChange={(e) => onChangeBenef(idx, e)}
+                    min="0"
+                    placeholder="Ej: 7"
+                    style={inputStyle}
+                  />
+                  <select
+                    name="sexo"
+                    value={b.sexo}
+                    onChange={(e) => onChangeBenef(idx, e)}
+                    style={inputStyle}
+                  >
+                    <option value="">Selecciona…</option>
+                    <option value="Femenino">Femenino</option>
+                    <option value="Masculino">Masculino</option>
+                    <option value="Otro">Otro</option>
+                  </select>
+
+                  <div style={{ display: 'flex', justifyContent: 'center' }}>
+                    <button type="button" onClick={() => eliminarBeneficiario(idx)} style={btnDanger}>
+                      Eliminar
+                    </button>
+                  </div>
+                </div>
+              ))}
+
+              <div style={{ display: 'flex', gap: 10 }}>
+                <button type="button" onClick={agregarBeneficiario} style={btnGhost}>
+                  + Agregar hijo
+                </button>
+              </div>
+            </div>
+          </section>
+
+          {/* Mensajes + Enviar */}
+          <form onSubmit={onSubmit} style={{ display: 'grid', gap: 10, marginTop: 12 }}>
+            {error && (
+              <div style={{ color: '#b00020', background: '#fee2e2', padding: 10, borderRadius: 8 }}>
+                {error}
+              </div>
+            )}
+            {mensaje && (
+              <div style={{ color: '#065f46', background: '#d1fae5', padding: 10, borderRadius: 8 }}>
+                {mensaje}
+              </div>
+            )}
+
+            <div style={{ display: 'flex', justifyContent: 'flex-start' }}>
+              <button
+                type="submit"
+                disabled={enviando}
+                style={{
+                  background: enviando ? '#bbb' : 'linear-gradient(90deg,#7c3aed,#6d28d9)',
+                  color: 'white',
+                  padding: '10px 16px',
+                  borderRadius: 10,
+                  fontWeight: 700,
+                  boxShadow: '0 8px 18px rgba(78, 28, 148, 0.25)',
+                  border: 'none',
+                  cursor: enviando ? 'not-allowed' : 'pointer',
+                }}
+              >
+                {enviando ? 'Enviando…' : 'Guardar / Enviar'}
+              </button>
+            </div>
+          </form>
+        </div>
+      </main>
+
+      {/* FOOTER (siempre al fondo) */}
+      <footer
+        style={{
+          backgroundColor: '#0a3d4d',
+          color: 'white',
+          textAlign: 'center',
+          padding: '16px 8px',
+        }}
+      >
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 12 }}>
+          <img src="/informatica.svg" alt="Departamento de Informática" style={{ height: 40 }} />
+          <span style={{ fontSize: 14 }}>
+            © 2025 Departamento de Informática, Todos los Derechos Reservados | Mesa de Ayuda:
+            <strong> 722976090 </strong> Anexo: <strong>6114 / 6109</strong>
+          </span>
+        </div>
+      </footer>
+    </div>
+  );
+}
+
+/* —— Estilos reutilizables —— */
+const inputStyle = {
+  width: '100%',
+  padding: '10px 12px',
+  borderRadius: 10,
+  border: '1px solid #e5e7eb',
+  outline: 'none',
+  boxShadow: '0 1px 0 rgba(0,0,0,0.02) inset',
+};
+
+const btnDanger = {
+  background: '#fee2e2',
+  color: '#991b1b',
+  padding: '8px 12px',
+  borderRadius: 10,
+  fontWeight: 700,
+  border: '1px solid #fecaca',
+  cursor: 'pointer',
+};
+
+const btnGhost = {
+  background: '#fff5f5',
+  color: '#7a1f1f',
+  padding: '10px 12px',
+  borderRadius: 10,
+  fontWeight: 700,
+  border: '1px dashed #fca5a5',
+  cursor: 'pointer',
+};
